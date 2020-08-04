@@ -31,16 +31,32 @@
 using namespace std;
 using namespace sql;
 
+struct SqlObj{
+    mysql::MySQL_Driver *driver {nullptr};
+    unique_ptr<Connection> con;
+    unique_ptr<Statement> stmt;
+    unique_ptr<ResultSet> sql_res;
+};
+
 class Table {
 public:
     using column_val_t = pair<string, string>;
 
 public:
-    explicit Table(string table_name);
+    void setHost(const string &host) {_host = host;}
+    void setUser(const string &user) {_user = user;}
+    void setPassword(const string &password) {_password = password;}
+    void setSchema(const string &schema) {_schema = schema;}
+    void applyDBSettings();
+
     ~Table() = default;
+
+    static Table loadTable(const string &table);
 
     bool findByID(const string &id);
     bool execute();
+
+    void printRow() const;
 
     void updateColumnValue(const column_val_t &column_value);
 
@@ -48,8 +64,9 @@ public:
 
     void setColumnValue(const column_val_t &column_value);
 
-
 private:
+    explicit Table(string table);
+
     void _init();
 
     string _concat(const map<string, string>::iterator &cl_val_node);
@@ -61,11 +78,14 @@ private:
 
     mutable map<string, string> row;
 
+    // DB settings
+    string _host;
+    string _user;
+    string _password;
+    string _schema;
+
     // Sql data
-    mysql::MySQL_Driver *driver {nullptr};
-    unique_ptr<Connection> con;
-    unique_ptr<Statement> stmt;
-    unique_ptr<ResultSet> sql_res;
+    static unique_ptr<SqlObj> sql_obj;
 };
 
 

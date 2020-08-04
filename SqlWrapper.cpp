@@ -4,11 +4,21 @@
 
 #include "SqlWrapper.h"
 
-Table::Table(string table_name) : _table_name(table_name) {
-    _init();
+unique_ptr<SqlObj> Table::sql_obj(nullptr);
+
+Table Table::loadTable(const string &table) {
+    return Table(table);
+}
+
+Table::Table(string table) : _table_name(table) {
+    if (!sql_obj.get()) _init();
 }
 
 void Table::_init() {
+    sql_obj.reset(new SqlObj);
+
+    auto &[driver, con, stmt, sql_res] = *sql_obj;
+
     driver = mysql::get_mysql_driver_instance();
 
     con.reset(driver->connect("localhost:3306", "root", ""));
@@ -18,6 +28,8 @@ void Table::_init() {
 }
 
 bool Table::findByID(const string &id) {
+    auto &sql_res = sql_obj->sql_res;
+    auto &stmt = sql_obj->stmt;
 
     sql_res.reset(stmt->executeQuery("SELECT * FROM " + _table_name + " WHERE ID=" + id + " ORDER BY id ASC"));
 
@@ -60,6 +72,7 @@ void Table::setColumnValue(const column_val_t &column_value) {
 }
 
 void Table::updateColumnValue(const column_val_t &column_value) {
+    auto &stmt = sql_obj->stmt;
 
     auto cl_value_node = row.find(column_value.first);
 
@@ -86,3 +99,19 @@ string Table::_concat(const Table::column_val_t &cl_val) {
 string Table::_concatInsert() {
 
 }
+
+void Table::printRow() const {
+    for (const auto &[column, val] : row) {
+        cout << column << ", " << val << endl;
+    }
+}
+
+void Table::applyDBSettings() {
+    auto &[driver, con, stmt, sql_res] = *sql_obj;
+
+    con.reset(driver->connect(_host, _user, _password));
+    con->setSchema(_schema);
+
+    stmt.reset(con->createStatement());
+}
+

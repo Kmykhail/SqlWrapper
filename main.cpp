@@ -3,10 +3,15 @@
 #include "SqlWrapper.h"
 
 int main() {
-    Table sw("Pages");
+    auto pages = Table::loadTable("Pages");
+    if (pages.findByID("1")) {
+        pages.printRow();
+    }
 
-    sw.findByID("1");
-    sw.updateColumnValue({"LangID", "12"});
+    auto test = Table::loadTable("test");
+    if (test.findByID("1")) {
+        test.printRow();
+    }
 
     return 0;
 }
