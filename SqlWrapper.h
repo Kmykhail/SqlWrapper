@@ -23,10 +23,13 @@
 #endif
 
 #include <cppconn/statement.h>
+
 #include <string>
 #include <memory>
 #include <list>
 #include <cassert>
+#include <sstream>
+#include <iterator>
 
 using namespace std;
 using namespace sql;
@@ -36,6 +39,12 @@ struct SqlObj{
     unique_ptr<Connection> con;
     unique_ptr<Statement> stmt;
     unique_ptr<ResultSet> sql_res;
+};
+
+enum class ExecuteType {
+    NotReady,
+    ReadyForInsert,
+    ReadyForUpdate
 };
 
 class Table {
@@ -69,14 +78,20 @@ private:
 
     void _init();
 
-    string _concat(const map<string, string>::iterator &cl_val_node);
-    string _concat(const column_val_t &cl_val);
-    string _concatInsert();
+    string _concat(const map<string, string>::iterator &cl_val_node) const;
+    string _concat(const column_val_t &cl_val) const;
+
+    string _concatInsert() const;
+    string _concatSet() const;
 
 private:
     string _table_name;
 
-    mutable map<string, string> row;
+    vector<map<string, string>::iterator> _order_row;
+
+    mutable map<string, string> _row;
+
+    ExecuteType _exec_type {ExecuteType::NotReady};
 
     // DB settings
     string _host;
@@ -85,7 +100,7 @@ private:
     string _schema;
 
     // Sql data
-    static unique_ptr<SqlObj> sql_obj;
+    static unique_ptr<SqlObj> _sql_obj;
 };
 
 

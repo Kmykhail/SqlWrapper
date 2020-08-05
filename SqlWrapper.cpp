@@ -4,20 +4,20 @@
 
 #include "SqlWrapper.h"
 
-unique_ptr<SqlObj> Table::sql_obj(nullptr);
+unique_ptr<SqlObj> Table::_sql_obj(nullptr);
 
 Table Table::loadTable(const string &table) {
     return Table(table);
 }
 
 Table::Table(string table) : _table_name(table) {
-    if (!sql_obj.get()) _init();
+    if (!_sql_obj.get()) _init();
 }
 
 void Table::_init() {
-    sql_obj.reset(new SqlObj);
+    _sql_obj.reset(new SqlObj);
 
-    auto &[driver, con, stmt, sql_res] = *sql_obj;
+    auto &[driver, con, stmt, sql_res] = *_sql_obj;
 
     driver = mysql::get_mysql_driver_instance();
 
@@ -28,8 +28,8 @@ void Table::_init() {
 }
 
 bool Table::findByID(const string &id) {
-    auto &sql_res = sql_obj->sql_res;
-    auto &stmt = sql_obj->stmt;
+    auto &sql_res = _sql_obj->sql_res;
+    auto &stmt = _sql_obj->stmt;
 
     sql_res.reset(stmt->executeQuery("SELECT * FROM " + _table_name + " WHERE ID=" + id + " ORDER BY id ASC"));
 
@@ -41,20 +41,25 @@ bool Table::findByID(const string &id) {
     while(sql_res->next()) {
 
         for (uint32_t i = 1; i <= column_count; ++i) {
-            row.emplace(res_meta->getColumnName(i), sql_res->getString(i));
+            auto [row_node, res] = _row.emplace(res_meta->getColumnName(i), "\'" + sql_res->getString(i) + "\'");
+            if (res) {
+                _order_row.emplace_back(row_node);
+            }
         }
 
         ++sql_status;
     }
+
+    if (sql_res) _exec_type = ExecuteType ::ReadyForUpdate;
 
     return sql_status;
 }
 
 string Table::getColumnValue(const string &cl) const {
 
-    auto cl_value_node = row.find(cl);
+    auto cl_value_node = _row.find(cl);
 
-    assert((cl_value_node != row.end()) && "There is no such column in the table");
+    assert((cl_value_node != _row.end()) && "There is no such column in the table");
 
     return cl_value_node->second;
 }
@@ -63,51 +68,92 @@ void Table::setColumnValue(const column_val_t &column_value) {
 
     auto &[cl, val] = column_value;
 
-    auto cl_value_node = row.find(cl);
+    auto cl_value_node = _row.find(cl);
 
-    assert((cl_value_node != row.end()) && "There is no such column in the table");
+    assert((cl_value_node != _row.end()) && "There is no such column in the table");
 
     cl_value_node->second = val;
 
 }
 
 void Table::updateColumnValue(const column_val_t &column_value) {
-    auto &stmt = sql_obj->stmt;
+    auto &stmt = _sql_obj->stmt;
 
-    auto cl_value_node = row.find(column_value.first);
+    auto cl_value_node = _row.find(column_value.first);
 
-    assert((cl_value_node != row.end()) && "There is no such column in the table");
+    assert((cl_value_node != _row.end()) && "There is no such column in the table");
 
     stmt->executeUpdate("UPDATE " + _table_name + " SET " + _concat(column_value));
 }
 
-// TODO
 bool Table::execute() {
-//    sql_res.reset(stmt->executeQuery("INSERT INTO " + _table_name + " VALUES (" + _concatInsert() + ")"));
-    return false;
+    auto &sql_res = _sql_obj->sql_res;
+    auto &stmt = _sql_obj->stmt;
+
+    switch (_exec_type) {
+        case ExecuteType::ReadyForInsert :
+        {
+            uint32_t sql_status = 0;
+
+            sql_res.reset(stmt->executeQuery("INSERT INTO " + _table_name + " VALUES (" + _concatInsert() + ")"));
+            while(sql_res->next()) ++sql_status;
+
+            if (!sql_status) return false;
+        }
+        case ExecuteType::ReadyForUpdate :
+        {
+            auto id_node = _row.find("ID");
+            if (id_node == _row.end()) return false;
+
+            stmt->executeUpdate("UPDATE " + _table_name + " SET " + _concatSet() + " WHERE ID=" + id_node->second);
+        }
+        default:
+            break;
+    }
+
+    return true;
 }
 
-string Table::_concat(const map<string, string>::iterator &cl_val_node) {
+string Table::_concat(const map<string, string>::iterator &cl_val_node) const{
     return cl_val_node->first + "=" + cl_val_node->second;
 }
 
-string Table::_concat(const Table::column_val_t &cl_val) {
+string Table::_concat(const Table::column_val_t &cl_val) const {
     return cl_val.first + "=" + cl_val.second;
 }
 
-// TODO
-string Table::_concatInsert() {
+string Table::_concatInsert() const {
 
+    string res;
+
+    for (auto it = _order_row.begin(); it != _order_row.end(); ++it) {
+        res += (*it)->second;
+        if (it != _order_row.end() - 1) res += ",";
+    }
+
+    return res;
+}
+
+string Table::_concatSet() const {
+
+    string res;
+
+    for (auto it = _order_row.begin(); it != _order_row.end(); ++it) {
+        res += (*it)->first + "=" + (*it)->second;
+        if (it != _order_row.end() - 1) res += ",";
+    }
+
+    return res;
 }
 
 void Table::printRow() const {
-    for (const auto &[column, val] : row) {
+    for (const auto &[column, val] : _row) {
         cout << column << ", " << val << endl;
     }
 }
 
 void Table::applyDBSettings() {
-    auto &[driver, con, stmt, sql_res] = *sql_obj;
+    auto &[driver, con, stmt, sql_res] = *_sql_obj;
 
     con.reset(driver->connect(_host, _user, _password));
     con->setSchema(_schema);

@@ -1,4 +1,6 @@
 #include <iostream>
+#include <sstream>
+#include <iterator>
 
 #include "SqlWrapper.h"
 
@@ -8,10 +10,8 @@ int main() {
         pages.printRow();
     }
 
-    auto test = Table::loadTable("test");
-    if (test.findByID("1")) {
-        test.printRow();
-    }
+    pages.setColumnValue({"SiteID", "957"});
+    pages.execute();
 
     return 0;
 }
