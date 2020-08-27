@@ -118,11 +118,8 @@ protected:
 
 class TableCollection : public Table {
 public:
-    explicit TableCollection(string qw);
-    void findArray();
-
-    using iterator = vector<Table>::iterator;
-    using const_iterator = vector<Table>::const_iterator;
+    using iterator = vector<unique_ptr<Table>>::iterator;
+    using const_iterator = vector<unique_ptr<Table>>::const_iterator;
 
     iterator begin() { return _table_rows.begin(); }
     const_iterator begin() const { return _table_rows.begin(); }
@@ -130,8 +127,12 @@ public:
     iterator end() { return _table_rows.end(); }
     const_iterator end() const { return _table_rows.end(); }
 
+public:
+    explicit TableCollection(string qw);
+    void findArray();
+
 private:
-    vector<Table> _table_rows;
+    vector<unique_ptr<Table>> _table_rows;
 };
 
 #endif //SQLWRAPPER_SQLWRAPPER_H

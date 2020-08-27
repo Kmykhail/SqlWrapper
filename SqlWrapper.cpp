@@ -196,7 +196,7 @@ void TableCollection::findArray() {
             }
         }
 
-        _table_rows.emplace_back(move(static_cast<Table&>(*this)));
+        _table_rows.emplace_back(new Table(static_cast<Table&>(*this)));
 
         _row_data.clear();
         _order_row.clear();

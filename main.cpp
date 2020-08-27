@@ -20,7 +20,7 @@ int main() {
     cout << "!!!!!!Check FindArray!!!!!" << endl;
 
     for (auto &it : tab_coll) {
-        it.printRow();
+        it->printRow();
     }
 
 
