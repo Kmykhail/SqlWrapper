@@ -34,6 +34,11 @@
 using namespace std;
 using namespace sql;
 
+// TODO
+// clean code
+// Table collection
+// tests
+
 struct SqlObj{
     mysql::MySQL_Driver *driver {nullptr};
     unique_ptr<Connection> con;
@@ -73,23 +78,30 @@ public:
 
     void setColumnValue(const column_val_t &column_value);
 
-private:
+protected:
     explicit Table(string table);
 
     void _init();
 
-    string _concat(const map<string, string>::iterator &cl_val_node) const;
+    /**
+     * Concat column name and its value
+     * Example: ID=1
+     * @param cl_val
+     * @return string like cl_name=cl_val
+     */
     string _concat(const column_val_t &cl_val) const;
 
-    string _concatInsert() const;
-    string _concatSet() const;
+    string _concatAllRows() const;
 
-private:
+    string _concatInsert() const;
+    virtual string _concatSet() const;
+
+protected:
     string _table_name;
 
     vector<map<string, string>::iterator> _order_row;
 
-    mutable map<string, string> _row;
+    mutable map<string, string> _row_data;
 
     ExecuteType _exec_type {ExecuteType::NotReady};
 
@@ -103,5 +115,23 @@ private:
     static unique_ptr<SqlObj> _sql_obj;
 };
 
+
+class TableCollection : public Table {
+public:
+    explicit TableCollection(string qw);
+    void findArray();
+
+    using iterator = vector<Table>::iterator;
+    using const_iterator = vector<Table>::const_iterator;
+
+    iterator begin() { return _table_rows.begin(); }
+    const_iterator begin() const { return _table_rows.begin(); }
+
+    iterator end() { return _table_rows.end(); }
+    const_iterator end() const { return _table_rows.end(); }
+
+private:
+    vector<Table> _table_rows;
+};
 
 #endif //SQLWRAPPER_SQLWRAPPER_H

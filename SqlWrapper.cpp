@@ -41,7 +41,7 @@ bool Table::findByID(const string &id) {
     while(sql_res->next()) {
 
         for (uint32_t i = 1; i <= column_count; ++i) {
-            auto [row_node, res] = _row.emplace(res_meta->getColumnName(i), "\'" + sql_res->getString(i) + "\'");
+            auto [row_node, res] = _row_data.emplace(res_meta->getColumnName(i), "\'" + sql_res->getString(i) + "\'");
             if (res) {
                 _order_row.emplace_back(row_node);
             }
@@ -57,31 +57,31 @@ bool Table::findByID(const string &id) {
 
 string Table::getColumnValue(const string &cl) const {
 
-    auto cl_value_node = _row.find(cl);
+    auto cl_value_node = _row_data.find(cl);
 
-    assert((cl_value_node != _row.end()) && "There is no such column in the table");
+    assert((cl_value_node != _row_data.end()) && "There is no such column in the table");
 
     return cl_value_node->second;
 }
 
 void Table::setColumnValue(const column_val_t &column_value) {
+    _row_data.emplace(column_value);
 
-    auto &[cl, val] = column_value;
+//    auto &[cl, val] = column_value;
 
-    auto cl_value_node = _row.find(cl);
-
-    assert((cl_value_node != _row.end()) && "There is no such column in the table");
-
-    cl_value_node->second = val;
-
+//    auto cl_value_node = _row_data.find(cl);
+//
+//    assert((cl_value_node != _row_data.end()) && "There is no such column in the table");
+//
+//    cl_value_node->second = val;
 }
 
 void Table::updateColumnValue(const column_val_t &column_value) {
     auto &stmt = _sql_obj->stmt;
 
-    auto cl_value_node = _row.find(column_value.first);
+    auto cl_value_node = _row_data.find(column_value.first);
 
-    assert((cl_value_node != _row.end()) && "There is no such column in the table");
+    assert((cl_value_node != _row_data.end()) && "There is no such column in the table");
 
     stmt->executeUpdate("UPDATE " + _table_name + " SET " + _concat(column_value));
 }
@@ -102,10 +102,12 @@ bool Table::execute() {
         }
         case ExecuteType::ReadyForUpdate :
         {
-            auto id_node = _row.find("ID");
-            if (id_node == _row.end()) return false;
+            auto id_node = _row_data.find("ID");
+            if (id_node == _row_data.end()) return false;
 
-            stmt->executeUpdate("UPDATE " + _table_name + " SET " + _concatSet() + " WHERE ID=" + id_node->second);
+            auto stmt_res = stmt->executeUpdate("UPDATE " + _table_name + " SET " + _concatSet() + " WHERE ID=" + id_node->second);
+            if (!stmt_res) return false;
+
         }
         default:
             break;
@@ -114,8 +116,19 @@ bool Table::execute() {
     return true;
 }
 
-string Table::_concat(const map<string, string>::iterator &cl_val_node) const{
-    return cl_val_node->first + "=" + cl_val_node->second;
+string Table::_concatAllRows() const {
+    if (_row_data.empty()) return {};
+
+    string res;
+
+    auto last_element = _row_data.rbegin();
+
+    for (const auto &data : _row_data) {
+        res += _concat(data);
+        if (data != *last_element) res += " AND ";
+    }
+
+    return res;
 }
 
 string Table::_concat(const Table::column_val_t &cl_val) const {
@@ -147,7 +160,7 @@ string Table::_concatSet() const {
 }
 
 void Table::printRow() const {
-    for (const auto &[column, val] : _row) {
+    for (const auto &[column, val] : _row_data) {
         cout << column << ", " << val << endl;
     }
 }
@@ -161,3 +174,31 @@ void Table::applyDBSettings() {
     stmt.reset(con->createStatement());
 }
 
+
+TableCollection::TableCollection(string table_name) : Table(move(table_name)) {}
+
+void TableCollection::findArray() {
+    auto &sql_res = _sql_obj->sql_res;
+    auto &stmt = _sql_obj->stmt;
+
+    sql_res.reset(stmt->executeQuery("SELECT * FROM " + _table_name + " WHERE\n" + _concatAllRows()));
+
+    ResultSetMetaData *res_meta = sql_res->getMetaData();
+
+    uint32_t column_count = res_meta->getColumnCount();
+
+    while(sql_res->next()) {
+
+        for (uint32_t i = 1; i <= column_count; ++i) {
+            auto [row_node, res] = _row_data.emplace(res_meta->getColumnName(i), "\'" + sql_res->getString(i) + "\'");
+            if (res) {
+                _order_row.emplace_back(row_node);
+            }
+        }
+
+        _table_rows.emplace_back(move(static_cast<Table&>(*this)));
+
+        _row_data.clear();
+        _order_row.clear();
+    }
+}

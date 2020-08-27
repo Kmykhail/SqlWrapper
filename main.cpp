@@ -10,8 +10,19 @@ int main() {
         pages.printRow();
     }
 
-    pages.setColumnValue({"SiteID", "957"});
+    pages.setColumnValue({"SiteID", "222"});
     pages.execute();
+
+    TableCollection tab_coll("TestCB_1");
+    tab_coll.setColumnValue({"SiteID", "12"});
+    tab_coll.findArray();
+
+    cout << "!!!!!!Check FindArray!!!!!" << endl;
+
+    for (auto &it : tab_coll) {
+        it.printRow();
+    }
+
 
     return 0;
 }
