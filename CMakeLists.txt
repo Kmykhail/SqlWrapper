@@ -2,13 +2,12 @@ cmake_minimum_required(VERSION 3.14)
 project(SqlWrapper)
 
 set(CMAKE_CXX_STANDARD 17)
+set(SOURCE_FILE main.cpp)
+add_executable(SqlWrapper_run ${SOURCE_FILE})
 
-set(SQL_CONN /usr/include/)
-include_directories(${SQL_CONN})
-link_directories(${SQL_CONN})
+include_directories(wrapper)
 
-set(SQL_LIB /usr/lib)
-link_directories(${SQL_LIB})
+add_subdirectory(wrapper)
+add_subdirectory(SqlWrapper_test)
 
-add_executable(SqlWrapper main.cpp SqlWrapper.cpp SqlWrapper.h)
-target_link_libraries(SqlWrapper -lcurl -lmysqlcppconn)
+target_link_libraries(SqlWrapper_run SqlWrapper)
